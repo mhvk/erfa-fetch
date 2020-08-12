@@ -1,12 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
-import re
-import sys
-
-# for py2/py3 compatibility
-import six
-
 """
 This script downloads the latest SOFA, and then transforms the code to
 include the appropriate copyright and function name changes.
@@ -22,6 +14,9 @@ Or do::
 To see the options.
 
 """
+
+import re
+import sys
 
 
 DEFAULT_INLINE_LICENSE_STR = """
@@ -90,6 +85,7 @@ ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
+
 def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
                            inlinelicensestr=DEFAULT_INLINE_LICENSE_STR,
                            endlicensestr=DEFAULT_FILE_END_LICENSE_STR,
@@ -109,11 +105,11 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
     import tarfile
     import datetime
 
-    # this dict maps filenames to the code in the form of a list of strings.
-    # they do *not* have the end license, as that gets added when writing.
+    # This dict maps filenames to the code in the form of a list of strings.
+    # They do *not* have the end license, as that gets added when writing.
     filecontents = {}
 
-    # this is the current year for whoever is running this.
+    # This is the current year for whoever is running this.
     if copyrightyear is None:
         copyrightyear = datetime.datetime.now().year
         if copyrightyear < 2013:
@@ -123,7 +119,7 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
                   "copyright-year argument for the copyright year to be "
                   "correct.")
 
-    #turn the license strings into a SOFA-style C comment
+    # Turn the license strings into a SOFA-style C comment.
     inlinelicensestr = inlinelicensestr.format(libnameuppercase=libname.upper(),
                                                curryr=copyrightyear)
     inlinelicensestr = '**  ' + '\n**  '.join(inlinelicensestr.split('\n')) + '\n'
@@ -131,12 +127,11 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
                                          curryr=copyrightyear)
     endlicensestr = '**  ' + '\n**  '.join(endlicensestr.split('\n'))
     endlicensestr = '/*' + ('-' * 70) + '\n' + endlicensestr + '\n*/\n'
-    #first open the tar file
+    # First open the tar file.
     tfn = tarfile.open(sofatarfn)
     try:
-        # extract macro names from sofam.h
-        # except SOFAMHDEF
-        # we will use it later
+        # Extract macro names from sofam.h, except SOFAMHDEF,
+        # which we will use it later.
         macros = []
         macros_exclude = ['SOFAMHDEF']
 
@@ -144,7 +139,7 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
             contents = None
 
             if ti.name.endswith('t_sofa_c.c'):
-                #test file
+                # Test file.
                 contents = reprocess_sofa_test_lines(tfn.extractfile(ti),
                                                      func_prefix,
                                                      libname,
@@ -162,32 +157,32 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
                                                   func_prefix,
                                                   libname,
                                                   inlinelicensestr)
-            #ignore everything else
+            # Ignore everything else.
             if contents is not None:
-                # if "sofa" appears in the name, change appropriately
+                # If "sofa" appears in the name, change appropriately.
                 filename = ti.name.split('/')[-1].replace('sofa', libname.lower())
 
                 filecontents[filename] = contents
 
-        #now write out all the files, including the end license
+        # Now write out all the files, including the end license.
         dirnm = os.path.abspath(os.path.join('.', libname))
         if not os.path.isdir(dirnm):
             if verbose:
                 print('Making directory', dirnm)
             os.mkdir(dirnm)
 
-        # prepare to prefix the macros.
-        # this is done here instead of in the `reprocess_sofa_*_lines`
+        # Prepare to prefix the macros.
+        # This is done here instead of in the `reprocess_sofa_*_lines`
         # functions because the macros have to be extracted from sofam.h, and
-        # there's no guarantee above that it will come first
+        # there's no guarantee above that it will come first.
 
-        # given a re match obj, return
-        # the match (the macro name), prefixed and upper cased
+        # Given a re match obj, return the match (the macro name),
+        # prefixed and upper cased.
         def prefix_macro(matchobj):
             macro = matchobj.group(0)
             return 'ERFA_%s' % macro.upper()
 
-        # precompile a regular expresion for each macro name
+        # Precompile a regular expresion for each macro name.
         repls = [re.compile(r'\b%s\b' % macro) for macro in macros]
 
         for fn, lines in filecontents.items():
@@ -197,7 +192,8 @@ def reprocess_sofa_tarfile(sofatarfn, libname='erfa', func_prefix='era',
                 check_for_sofa(lines, fn)
 
             alllines = ''.join(lines)
-            # join the lines and replace the macros with the versions with an ERFA prefix
+            # Join the lines and replace the macros with the versions with
+            # an ERFA prefix.
             for repl in repls:
                 alllines = repl.sub(prefix_macro, alllines)
 
@@ -215,29 +211,30 @@ def reprocess_sofa_h_lines(inlns, func_prefix, libname, inlinelicensestr):
     outlns = []
     donewheader = False
 
-    for l in inlns:
-        l = l.decode()
-        if l.startswith('#'):
-            #includes and #ifdef/#define directives
-            outlns.append(l.replace('SOFA', libname.upper()).replace('sofa', libname.lower()))
-        elif l.startswith('**'):
+    for ln in inlns:
+        ln = ln.decode()
+        if ln.startswith('#'):
+            # Includes and #ifdef/#define directives.
+            outlns.append(ln.replace('SOFA', libname.upper())
+                          .replace('sofa', libname.lower()))
+        elif ln.startswith('**'):
             if not donewheader:
-                if l.startswith('**  This file is part of the International Astronomical Union'):
-                    #after this it's all IAU/SOFA-specific stuff, so replace with ours
+                if ln.startswith('**  This file is part of the International Astronomical Union'):
+                    # After this it's all IAU/SOFA-specific stuff,
+                    # so replace with ours.
                     donewheader = True
                     outlns.append(inlinelicensestr)
-                elif 's o f a' in l:
-                    outlns.append(l.replace('s o f a', ' '.join(libname.lower())))
+                elif 's o f a' in ln:
+                    outlns.append(ln.replace('s o f a', ' '.join(libname.lower())))
                 else:
-                    outlns.append(l.replace('SOFA', libname.upper()))
+                    outlns.append(ln.replace('SOFA', libname.upper()))
 
-        elif l.startswith('/*----------------------------------------------------------------------'):
-            #in license section at end of file
+        elif ln.startswith('/*----------------------------------------------------------------------'):
+            # In license section at end of file.
             outlns.append('\n')
             break
         else:
-            outlns.append(l.replace('iau', func_prefix))
-
+            outlns.append(ln.replace('iau', func_prefix))
 
     return outlns
 
@@ -246,61 +243,61 @@ def reprocess_sofa_c_lines(inlns, func_prefix, libname, inlinelicensestr):
     spaced_prefix = ' '.join(func_prefix)
 
     outlns = []
-    inhdr = True  # start inside the header before the function def'n
-    insofapart = False  # the part of the header that's SOFA-specific
-    replacedprefix = False  # indicates if the "iau" line has been hit
-    replacedspacedprefix = False  # indicates if the "i a u" line has been hit
-    incopyright = False  # indicates being inside the copyright/revision part of the doc comment of the SOFA function
+    inhdr = True  # Start inside the header before the function definition.
+    insofapart = False  # The part of the header that's SOFA-specific.
+    replacedprefix = False  # Indicates if the "iau" line has been hit.
+    replacedspacedprefix = False  # Indicates if the "i a u" line has been hit.
+    incopyright = False  # Indicates being inside the copyright/revision part of the doc comment of the SOFA function
 
-    for l in inlns:
-        l = l.decode()
+    for ln in inlns:
+        ln = ln.decode()
         if inhdr:
-            if (not replacedprefix) and 'iau' in l:
-                # this is the function definition and the end of the header
-                outlns.append(l.replace('iau', func_prefix))
+            if (not replacedprefix) and 'iau' in ln:
+                # This is the function definition and the end of the header.
+                outlns.append(ln.replace('iau', func_prefix))
                 replacedprefix = True
                 inhdr = False
             else:
-                # make sure the includes are correct for the new libname
-                outlns.append(l.replace('sofa', libname.lower()).replace('SOFA', libname.upper()))
+                # Make sure the includes are correct for the new libname.
+                outlns.append(ln.replace('sofa', libname.lower()).replace('SOFA', libname.upper()))
         elif insofapart:
-            #don't write out any of the disclaimer about being part of SOFA
-            if l.strip() == '**':
+            # Don't write out any of the disclaimer about being part of SOFA.
+            if ln.strip() == '**':
                 insofapart = False
-        elif l.startswith('**  This function is part of the International Astronomical Union'):
+        elif ln.startswith('**  This function is part of the International Astronomical Union'):
             insofapart = True
-        elif l.startswith('**  Status:'):
-            #don't include the status line which states if a function is
-            #canonical - ERFA isn't "canonical" as it is not IAU official
+        elif ln.startswith('**  Status:'):
+            # Don't include the status line which states if a function is
+            # canonical - ERFA isn't "canonical" as it is not IAU official.
             if outlns[-1].strip() == '**':
-                #Also drop the line with just '**' before it
+                # Also drop the line with just '**' before it.
                 del outlns[-1]
-        elif (not replacedspacedprefix) and 'i a u' in l:
-            outlns.append(l.replace('i a u', spaced_prefix))
+        elif (not replacedspacedprefix) and 'i a u' in ln:
+            outlns.append(ln.replace('i a u', spaced_prefix))
             replacedspacedprefix = True
         elif incopyright:
-            # skip the copyright/versioning section unless it's the end
-            if l.startswith('*/'):  # indicates end of the doc comment
+            # Skip the copyright/versioning section unless it's the end.
+            if ln.startswith('*/'):  # Indicates end of the doc comment.
                 incopyright = False
-                outlns.append(l)
-        elif l.startswith('/*----------------------------------------------------------------------'):
-            #this means we are in the license section, so we are done
-            #except for the final close-bracket always comes after the
-            #license section
+                outlns.append(ln)
+        elif ln.startswith('/*----------------------------------------------------------------------'):
+            # This means we are in the license section, so we are done
+            # except for the final close-bracket always comes after the
+            # license section.
             outlns.append('}\n')
             break
-        elif l.startswith('**  This revision:'):
+        elif ln.startswith('**  This revision:'):
             incopyright = True
-            #start of the copyright/versioning section - need to strip this because it contains SOFA references.
-
-            #but put in the correct inline license instead
+            # Start of the copyright/versioning section - need to strip this
+            # because it contains SOFA references.  Put in the correct inline
+            # license instead.
             if inlinelicensestr:
                 outlns.append(inlinelicensestr)
         else:
-            # need to replace 'iau' b/c other SOFA functions are often called
-            outlns.append(l.replace('iau', func_prefix)
-                           .replace('sofa', libname)
-                           .replace('SOFA', libname.upper()))
+            # Need to replace 'iau' b/c other SOFA functions are often called.
+            outlns.append(ln.replace('iau', func_prefix)
+                          .replace('sofa', libname)
+                          .replace('SOFA', libname.upper()))
 
     return outlns
 
@@ -313,32 +310,33 @@ def reprocess_sofa_test_lines(inlns, func_prefix, libname, inlinelicensestr):
     outlns = []
     inhdr = True
     insofapart = False
-    for l in inlns:
-        l = l.decode()
+    for ln in inlns:
+        ln = ln.decode()
         if inhdr:
-            if l.startswith('**  SOFA release'):
+            if ln.startswith('**  SOFA release'):
                 insofapart = True
 
             if insofapart:
-                if l.startswith('*/'):
+                if ln.startswith('*/'):
                     insofapart = inhdr = False
-                    outlns.append(l)
+                    outlns.append(ln)
                 continue
 
-            l = l.replace('s o f a', spaced_libname)
+            ln = ln.replace('s o f a', spaced_libname)
 
-        elif l.startswith('/*----------------------------------------------------------------------'):
-            #this means we are starting the license section, so we are done.
-            # Note that prior to SOFA 20170420, this was absent from t_erfa_c.c
+        elif ln.startswith('/*----------------------------------------------------------------------'):
+            # This means we are starting the license section, so we are done.
+            # Note that prior to SOFA 20170420, this was absent from t_erfa_c.c.
             break
 
-        l = l.replace('iau', func_prefix)
-        l = l.replace('sofa', libnamelow)
-        l = l.replace('SOFA', libnameup)
+        ln = ln.replace('iau', func_prefix)
+        ln = ln.replace('sofa', libnamelow)
+        ln = ln.replace('SOFA', libnameup)
 
-        outlns.append(l)
+        outlns.append(ln)
 
     return outlns
+
 
 def extract_macro_names(m, exclude):
     macros = []
@@ -353,22 +351,22 @@ def extract_macro_names(m, exclude):
     return macros
 
 
-#These strings are "acceptable" uses of the "SOFA" text
+# These strings are "acceptable" uses of the "SOFA" text.
 ACCEPTSOFASTRS = ['Derived, with permission, from the SOFA library']
 
 
 def check_for_sofa(lns, fn='', printfile=sys.stderr):
-    if isinstance(lns, six.string_types):
+    if isinstance(lns, str):
         lns = lns.split('\n')
-    for i, l in enumerate(lns):
-        if 'sofa' in l.lower():
+    for i, ln in enumerate(lns):
+        if 'sofa' in ln.lower():
             for s in ACCEPTSOFASTRS:
-                if s in l:
-                    #means skip the "else" part
+                if s in ln:
+                    # Means skip the "else" part.
                     break
             else:
                 infile = 'in file "{0}" at line {1}'.format(fn, i)
-                print('WARNING: Found "SOFA"{infile}:\n{ln}'.format(infile=infile, ln=l), file=printfile)
+                print('WARNING: Found "SOFA"{infile}:\n{ln}'.format(infile=infile, ln=ln), file=printfile)
 
 
 def download_sofa(url=None, dlloc='.', verbose=True):
@@ -376,7 +374,7 @@ def download_sofa(url=None, dlloc='.', verbose=True):
     Downloads the latest version of SOFA (or one specified via `url`) to
     the `dlloc` directory.
 
-    If `extract`, also extract that .tar.gz file
+    If `extract`, also extract that .tar.gz file.
     """
     import os
     from six.moves.urllib.request import urlretrieve
@@ -386,7 +384,7 @@ def download_sofa(url=None, dlloc='.', verbose=True):
 
     fn = url.split('/')[-1]
     if not os.path.isdir(dlloc):
-        raise ValueError('Requested dlloc {0} is not a directory'.format(dlloc))
+        raise ValueError('Requested dlloc {0} is not a directory.'.format(dlloc))
 
     fnpath = os.path.join(dlloc, fn)
     if verbose:
@@ -400,14 +398,14 @@ def _find_sofa_url_on_web_page(url='http://www.iausofa.org/current_C.html'):
     """
     Finds and returns the download URL for the latest C SOFA.
     """
-    from six.moves.urllib.request import urlopen
-    from six.moves.html_parser import HTMLParser
+    from urllib.request import urlopen
+    from html.parser import HTMLParser
 
-    # create a subclass and override the handler methods
+    # Create a subclass to override the handler methods.
     class SOFAParser(HTMLParser):
         def __init__(self):
             self.matched_urls = []
-            HTMLParser.__init__(self)
+            super().__init__()
 
         def handle_starttag(self, tag, attrs):
             if tag == 'a' and attrs[-1][-1].endswith('.tar.gz'):
@@ -416,8 +414,8 @@ def _find_sofa_url_on_web_page(url='http://www.iausofa.org/current_C.html'):
     parser = SOFAParser()
     u = urlopen(url)
     try:
-        for l in u:
-            parser.feed(l.decode())
+        for ln in u:
+            parser.feed(ln.decode())
     finally:
         u.close()
 
@@ -429,36 +427,6 @@ def _find_sofa_url_on_web_page(url='http://www.iausofa.org/current_C.html'):
                          str(fullurls))
 
     return fullurls[0]
-
-def find_sourcedir():
-    """
-    This function is used by the other scripts to find a directory that looks
-    like it countains a SOFA-derived multi-file distribution.
-
-    Takes in a
-    """
-    import glob
-
-    dirfns = [fn for fn in os.listdir('.') if os.path.isdir(fn)]
-    validdirs = []
-    for dirfn in dirfns:
-        hfiles = glob.glob(os.path.join(dirfn, '*.h'))
-        if len(hfiles) == 2:
-            flens = [len(fn) for fn in hfiles]
-            sofainname = [('sofa' in fn.lower()) for fn in hfiles]
-            if min(flens) == (max(flens) - 1) and not any(sofainname):
-                validdirs.append(dirfn)
-
-    if len(validdirs) < 1:
-        print('No srcdir was given and no directory that looked like it '
-              'was SOFA-derived was found.')
-        sys.exit(1)
-    if len(validdirs) > 2:
-        print('No srcdir was given and multiple directories were found '
-              'that look SOFA-derived: ' + str(validdirs))
-        sys.exit(1)
-
-    return validdirs[0]
 
 
 if __name__ == '__main__':
@@ -474,12 +442,12 @@ if __name__ == '__main__':
     parser.add_argument('--download', '-d', default=False, action='store_true',
                         help='Download the latest SOFA regardless regardless '
                         'of whether there is already a SOFA in the current '
-                        'directory')
+                        'directory.')
     parser.add_argument('--copyright-year', '-y', default=None,
                         help='The "current" year for the purposes of the end '
                               'of the copyright in each file.  If not given, '
                               'defaults to the current year when this script '
-                              'is run')
+                              'is run.')
     parser.add_argument('--quiet', '-q', default=False, action='store_true',
                         help='Print less info to the terminal.')
     args = parser.parse_args()
@@ -491,14 +459,14 @@ if __name__ == '__main__':
         sofatarfn = download_sofa(verbose=not args.quiet)
     elif args.sofafile is not None:
         try:
-            #try to open the file as a tar file
+            # Try to open the file as a tar file.
             f = tarfile.open(args.sofafile)
             f.close()
         except (IOError, tarfile.ReadError) as e:
             print('requested sofafile "{0}" is not a valid tar file: '
                   '"{1}"'.format(args.sofafile, e), file=sys.stderr)
             sys.exit(1)
-        #all is ok - use the file below
+        # All is ok - use the file below.
         sofatarfn = args.sofafile
     else:
         lstar = glob.glob('sofa_c*.tar.gz')
@@ -512,10 +480,10 @@ if __name__ == '__main__':
                 print('Did not find any sofa_c*.tar.gz files - downloading.')
             sofatarfn = download_sofa(verbose=not args.quiet)
         else:
-            sofatarfn = lstar[0]  # there is only one
+            sofatarfn = lstar[0]  # There is only one.
 
     if not args.quiet:
-        print('Using sofa tarfile "{0}" for reprocessing'.format(sofatarfn))
+        print('Using sofa tarfile "{0}" for reprocessing.'.format(sofatarfn))
 
     reprocess_sofa_tarfile(sofatarfn, verbose=not args.quiet,
                            copyrightyear=args.copyright_year)
