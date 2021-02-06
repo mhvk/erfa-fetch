@@ -289,9 +289,11 @@ def reprocess_sofa_c_lines(inlns, func_prefix, libname, inlinelicensestr):
         elif ln.startswith('**  This revision:'):
             incopyright = True
             # Start of the copyright/versioning section - need to strip this
-            # because it contains SOFA references.  Put in the correct inline
-            # license instead.
+            # because it contains SOFA references.  Instead, put this line
+            # with useful date information and the correct inline license.
+            outlns.append(ln)
             if inlinelicensestr:
+                outlns.append('**\n')
                 outlns.append(inlinelicensestr)
         else:
             # Need to replace 'iau' b/c other SOFA functions are often called.
